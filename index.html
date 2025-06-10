@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ESP32 Sensor Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      text-align: center;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      padding: 30px;
+      margin-top: 50px;
+      display: inline-block;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    h1 { color: #333; }
+  </style>
+</head>
+<body>
+  <h1>🚗 Vehicle Sensor Dashboard</h1>
+
+  <div class="card">
+    <h2>Temperature: <span id="field1">--</span> °C</h2>
+    <h2>Humidity: <span id="field2">--</span> %</h2>
+  </div>
+
+  <script>
+    const CHANNEL_ID = '2984942'; // replace this
+    const READ_API_KEY = 'NNKHF0TZCJHHNIVO'; // replace this, or leave '' if public
+
+    const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds/last.json?api_key=${READ_API_KEY}`;
+
+    async function fetchData() {
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        document.getElementById('field1').textContent = data.field1;
+        document.getElementById('field2').textContent = data.field2;
+      } catch (e) {
+        console.error("Error loading data", e);
+      }
+    }
+
+    fetchData(); // load once
+    setInterval(fetchData, 15000); // refresh every 15 seconds
+  </script>
+</body>
+</html>
