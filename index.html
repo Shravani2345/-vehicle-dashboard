@@ -1,52 +1,147 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>ESP32 Sensor Dashboard</title>
+  <meta charset="UTF-8">
+  <title>BNO055 Live Dashboard - ThingSpeak Data</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #f0f0f0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+      color: #222;
+      margin: 0;
+      min-height: 100vh;
+    }
+    h1 {
       text-align: center;
-      padding: 20px;
+      margin-top: 32px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #2a5298;
+      text-shadow: 0 2px 8px #fff8;
     }
-    .card {
-      background: white;
-      padding: 30px;
-      margin-top: 50px;
+    .dashboard {
+      max-width: 420px;
+      margin: 36px auto 0 auto;
+      padding: 32px 24px 20px 24px;
+      background: rgba(255,255,255,0.95);
+      border-radius: 18px;
+      box-shadow: 0 4px 24px rgba(42,82,152,0.13);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      animation: floatIn 0.8s cubic-bezier(.25,.8,.25,1);
+    }
+    @keyframes floatIn {
+      from { transform: translateY(40px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #e3eaf2;
+      font-size: 1.12em;
+    }
+    .row:last-child { border-bottom: none; }
+    .label {
+      font-weight: 600;
+      color: #2a5298;
+      letter-spacing: 0.5px;
+    }
+    .value {
+      font-family: 'Fira Mono', monospace;
+      font-size: 1.24em;
+      min-width: 60px;
+      text-align: right;
+      transition: color 0.3s;
+    }
+    .value[data-type="yaw"]   { color: #ff9800; }
+    .value[data-type="pitch"] { color: #2196f3; }
+    .value[data-type="roll"]  { color: #e91e63; }
+    .value[data-type="ax"]    { color: #4caf50; }
+    .value[data-type="ay"]    { color: #9c27b0; }
+    .value[data-type="az"]    { color: #607d8b; }
+    .updated {
+      text-align: right;
+      font-size: 0.95em;
+      color: #888;
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .refresh-icon {
+      width: 18px;
+      height: 18px;
       display: inline-block;
-      border-radius: 12px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      vertical-align: middle;
+      animation: spin 1s linear infinite;
+      opacity: 0.6;
     }
-    h1 { color: #333; }
+    @keyframes spin {
+      0% { transform: rotate(0deg);}
+      100% { transform: rotate(360deg);}
+    }
+    @media (max-width: 600px) {
+      .dashboard { max-width: 98vw; padding: 18px 6vw 12px 6vw; }
+      h1 { font-size: 1.3em; }
+      .row { font-size: 1em; }
+    }
   </style>
 </head>
 <body>
-  <h1>🚗 Vehicle Sensor Dashboard</h1>
-
-  <div class="card">
-    <h2>Temperature: <span id="field1">--</span> °C</h2>
-    <h2>Humidity: <span id="field2">--</span> %</h2>
+  <h1>BNO055 Live Dashboard</h1>
+  <div class="dashboard">
+    <div class="row"><span class="label">Yaw</span>   <span class="value" id="yaw"   data-type="yaw">--</span></div>
+    <div class="row"><span class="label">Pitch</span> <span class="value" id="pitch" data-type="pitch">--</span></div>
+    <div class="row"><span class="label">Roll</span>  <span class="value" id="roll"  data-type="roll">--</span></div>
+    <div class="row"><span class="label">Ax</span>    <span class="value" id="ax"    data-type="ax">--</span></div>
+    <div class="row"><span class="label">Ay</span>    <span class="value" id="ay"    data-type="ay">--</span></div>
+    <div class="row"><span class="label">Az</span>    <span class="value" id="az"    data-type="az">--</span></div>
+    <div class="updated" id="updated">
+      <svg class="refresh-icon" viewBox="0 0 24 24">
+        <path fill="#2a5298" d="M12,6V9L16,5L12,1V4C7.58,4 4,7.58 4,12C4,16.42 7.58,20 12,20C16.42,20 20,16.42 20,12H18C18,15.31 15.31,18 12,18C8.69,18 6,15.31 6,12C6,8.69 8.69,6 12,6Z"/>
+      </svg>
+      <span id="updated-text">Last updated: --</span>
+    </div>
   </div>
-
   <script>
-    const CHANNEL_ID = '2984942'; // replace this
-    const READ_API_KEY = 'NNKHF0TZCJHHNIVO'; // replace this, or leave '' if public
+    // For public channels, no API key needed!
+    const channelID = '2985994'; // Replace with your ThingSpeak Channel ID
+    const url = `https://api.thingspeak.com/channels/${channelID}/feeds/last.json`;
 
-    const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds/last.json?api_key=${READ_API_KEY}`;
-
-    async function fetchData() {
-      try {
-        const res = await fetch(url);
-        const data = await res.json();
-        document.getElementById('field1').textContent = data.field1;
-        document.getElementById('field2').textContent = data.field2;
-      } catch (e) {
-        console.error("Error loading data", e);
+    function animateValue(id, newValue) {
+      const el = document.getElementById(id);
+      if (el.textContent !== newValue) {
+        el.style.color = '#43a047';
+        setTimeout(() => { el.style.color = ''; }, 500);
       }
+      el.textContent = newValue;
     }
 
-    fetchData(); // load once
-    setInterval(fetchData, 15000); // refresh every 15 seconds
+    function fetchData() {
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          animateValue('yaw',   data.field1 || '--');
+          animateValue('pitch', data.field2 || '--');
+          animateValue('roll',  data.field3 || '--');
+          animateValue('ax',    data.field4 || '--');
+          animateValue('ay',    data.field5 || '--');
+          animateValue('az',    data.field6 || '--');
+          document.getElementById('updated-text').textContent =
+            'Last updated: ' + (data.created_at ? new Date(data.created_at).toLocaleString() : '--');
+        })
+        .catch(err => {
+          document.getElementById('updated-text').textContent = 'Error fetching data';
+        });
+    }
+
+    // Fetch data every 5 seconds
+    fetchData();
+    setInterval(fetchData, 5000);
   </script>
 </body>
 </html>
